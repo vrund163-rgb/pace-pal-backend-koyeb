@@ -44,6 +44,7 @@ class CalibrationState(BaseModel):
     pitchLengthMetres: Optional[float] = None
     cameraQuality: int = 0
     cameraQualityNote: str = ""
+    homography: Optional[list[float]] = None  # flattened 3x3, row-major, once calibrated
 
 
 class VideoQuality(BaseModel):
@@ -73,6 +74,20 @@ class TrackingPreview(BaseModel):
     note: str = ""
 
 
+class CalibrationPoints(BaseModel):
+    bowlerLeft: tuple[float, float]
+    bowlerRight: tuple[float, float]
+    batterLeft: tuple[float, float]
+    batterRight: tuple[float, float]
+
+
+class CalibratedResult(BaseModel):
+    lineM: Optional[float] = None  # lateral offset from centreline, metres
+    lengthM: Optional[float] = None  # distance from batter-end stumps, metres
+    bounceFrame: Optional[int] = None
+    note: str = ""
+
+
 PROCESSING_STAGES = [
     "Video uploaded",
     "Reading video metadata",
@@ -95,6 +110,7 @@ class Session(BaseModel):
     processingStageLabel: str = PROCESSING_STAGES[0]
     deliveries: list = Field(default_factory=list)
     trackingPreview: Optional[TrackingPreview] = None
+    calibratedResult: Optional[CalibratedResult] = None
     isSampleData: bool = False
     note: str = ""
     error: Optional[str] = None
