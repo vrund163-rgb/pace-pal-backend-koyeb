@@ -178,7 +178,12 @@ def process_session(session_id: str, video_path: str) -> None:
         # and rally/gap detection we haven't built.
 
         _set_stage(session, 5)  # Ball tracking
-        result = ball_tracking.track_ball(video_path)
+        def _on_progress(pct: int) -> None:
+            session.processingProgress = pct
+            storage_db.save_session(session)
+
+        result = ball_tracking.track_ball(video_path, progress_cb=_on_progress)
+        session.processingProgress = None
         session.trackingPreview = TrackingPreview(
             framesTotal=result.frames_total,
             framesDetected=result.frames_detected,

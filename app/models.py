@@ -108,6 +108,7 @@ class Session(BaseModel):
     status: Literal["draft", "uploaded", "processing", "complete", "failed"] = "draft"
     processingStage: int = 0
     processingStageLabel: str = PROCESSING_STAGES[0]
+    processingProgress: Optional[int] = None  # 0-100 within the current stage, when known
     deliveries: list = Field(default_factory=list)
     trackingPreview: Optional[TrackingPreview] = None
     calibratedResult: Optional[CalibratedResult] = None
