@@ -75,6 +75,7 @@ class TrackingPreview(BaseModel):
 
 
 class CalibrationPoints(BaseModel):
+    mode: Literal["creases", "stumps"] = "creases"
     bowlerLeft: tuple[float, float]
     bowlerRight: tuple[float, float]
     batterLeft: tuple[float, float]
@@ -82,9 +83,13 @@ class CalibrationPoints(BaseModel):
 
 
 class CalibratedResult(BaseModel):
-    lineM: Optional[float] = None  # lateral offset from centreline, metres
-    lengthM: Optional[float] = None  # distance from batter-end stumps, metres
-    bounceFrame: Optional[int] = None
+    lineM: Optional[float] = None  # lateral offset from centreline, metres (None if bounce not found)
+    lengthM: Optional[float] = None  # distance from batter-end stumps, metres (None if bounce not found)
+    bounceFrame: Optional[float] = None  # video frame number (can be between detected frames)
+    bounceX: Optional[float] = None  # bounce position in the video frame, pixels
+    bounceY: Optional[float] = None
+    bounceConfidence: Literal["clear", "weak", "none"] = "none"
+    calibrationMode: Literal["creases", "stumps"] = "creases"
     note: str = ""
 
 

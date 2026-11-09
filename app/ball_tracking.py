@@ -109,13 +109,13 @@ def _detect_sports_ball(session: ort.InferenceSession, frame: np.ndarray) -> tup
     return float(orig_x), float(orig_y), float(scores[best_i])
 
 
-TARGET_ANALYSED_FPS = 12      # check roughly this many frames per second of video
+TARGET_ANALYSED_FPS = 20      # check roughly this many frames per second of video (30fps video -> every 2nd frame)
 MAX_ANALYSED_FRAMES = 240     # hard cap on frames sent through the model
 
 
 def track_ball(video_path: str, progress_cb=None) -> TrackingResult:
     """
-    Checks only some frames (about 12 per second of video) instead of all of them. A bowled
+    Checks only some frames (up to about 20 per second of video) instead of all of them. A bowled
     ball is in the air for well under a second, so this still catches it several times, while
     cutting the slow model work by 2-10x. Frame numbers in the result are real video frame
     numbers, so they still line up with the original video.

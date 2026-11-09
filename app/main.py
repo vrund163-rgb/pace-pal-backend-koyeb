@@ -16,6 +16,7 @@ from . import storage_db
 from . import video_analysis
 from . import ball_tracking
 from . import homography
+from . import bounce
 
 STORAGE_DIR = os.path.join(os.path.dirname(__file__), "storage", "videos")
 os.makedirs(STORAGE_DIR, exist_ok=True)
@@ -63,28 +64,53 @@ def api_calibrate_session(session_id: str, points: CalibrationPoints):
         raise HTTPException(status_code=400, detail="No tracked trajectory available to calibrate against yet")
 
     image_points = [points.bowlerLeft, points.bowlerRight, points.batterLeft, points.batterRight]
-    H = homography.compute_homography(image_points)
+    H = homography.compute_homography(image_points, points.mode)
 
-    # Heuristic: the bounce is where the ball appears lowest in the frame (max pixel y)
-    # among tracked points. Real but rough -- not a certainty.
-    bounce_point = max(session.trackingPreview.trajectory, key=lambda p: p.y)
-    wx, wy = homography.pixel_to_world(H, (bounce_point.x, bounce_point.y))
-    length_m = homography.PITCH_LENGTH_M - wy
-
-    note = (
-        f"Calibrated from 4 marked stump positions. The bounce point was estimated as the frame where "
-        f"the tracked ball appeared lowest in the image (frame {bounce_point.frame}) -- a rough "
-        "heuristic, not a certainty, especially if the ball was only partially tracked. Line and length "
-        "are real measurements (the bounce sits on the ground, where this calibration is valid). Pace is "
-        "still not implemented -- it needs the ball's real height in the air, which a single camera can't "
-        "recover from 2D pixels alone."
-    )
+    traj = session.trackingPreview.trajectory
+    est = bounce.find_bounce([p.frame for p in traj], [p.x for p in traj], [p.y for p in traj])
 
     session.calibration.homography = H.flatten().tolist()
     session.calibration.status = "good"
     session.calibration.pitchLengthMetres = homography.PITCH_LENGTH_M
+
+    if not est.ok:
+        session.calibratedResult = CalibratedResult(
+            bounceConfidence="none", calibrationMode=points.mode,
+            note=(
+                "The pitch calibration worked, but the bounce couldn't be found in the tracked path, so no line "
+                "or length is shown rather than a guess. " + est.reason + " A clearer recording with the ball "
+                "detected in more frames usually fixes this."
+            ),
+        )
+        storage_db.save_session(session)
+        return session.model_dump()
+
+    wx, wy = homography.pixel_to_world(H, (est.x, est.y))
+    length_m = homography.PITCH_LENGTH_M - wy
+
+    caveat = (
+        " The bounce is found as the corner in the ball's path where it stops dropping and starts rising. "
+        "In simulated tests with clean tracking and clicks a few pixels off, line was typically within about "
+        "10 cm and length within about 1 m (it tended to read a little short on fuller balls); real footage "
+        "with missed or wrong detections will be less accurate. "
+        "Pace is not available -- it needs the ball's real height in the air, which one camera can't recover."
+    )
+    if points.mode == "stumps":
+        caveat = (
+            " WARNING: you calibrated from the stumps, which is very sensitive to click accuracy (the far "
+            "stumps are only a few pixels wide in the video). In simulation, length could be off by several "
+            "metres. Recalibrate using the crease corners if the pitch has crease lines." + caveat
+        )
+    if est.confidence == "clear":
+        note = "Bounce found clearly in the tracked path." + caveat
+    else:
+        note = ("LOW CONFIDENCE: the corner in the ball's path was only faintly visible, so treat these numbers "
+                "with caution." + caveat)
+
     session.calibratedResult = CalibratedResult(
-        lineM=round(wx, 3), lengthM=round(length_m, 2), bounceFrame=bounce_point.frame, note=note,
+        lineM=round(wx, 3), lengthM=round(length_m, 2),
+        bounceFrame=round(est.frame, 1), bounceX=round(est.x, 1), bounceY=round(est.y, 1),
+        bounceConfidence=est.confidence, calibrationMode=points.mode, note=note,
     )
     storage_db.save_session(session)
     return session.model_dump()
@@ -201,11 +227,10 @@ def process_session(session_id: str, video_path: str) -> None:
         _set_stage(session, 6)  # Results ready
         session.status = "complete"
         session.note = (
-            "Video metadata and quality were read from your real upload, and the ball was tracked "
-            "frame-by-frame with a trained YOLOv8 detector via ONNX Runtime (see trackingPreview). Calibration and "
-            "delivery-level pace/swing/line/length are not implemented yet, so no delivery data is "
-            "shown -- that requires converting pixel positions to real-world measurements, which "
-            "needs a calibration step this backend doesn't have yet."
+            "Video metadata and quality were read from your real upload, and the ball was tracked with a "
+            "trained YOLOv8 detector, checking some frames per second (see trackingPreview). Line and length "
+            "become available once you calibrate the pitch. Pace and full delivery analysis (swing, turn) are "
+            "not implemented: they need the ball's position in the air, which one camera can't provide."
         )
         storage_db.save_session(session)
 
