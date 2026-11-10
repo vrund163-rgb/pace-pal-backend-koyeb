@@ -55,6 +55,8 @@ class VideoQuality(BaseModel):
     lighting: Literal["good", "moderate", "poor"] = "moderate"
     stability: Literal["stable", "minor_movement", "unstable"] = "stable"
     ballVisibility: int = 0
+    frameCount: int = 0
+    durationSeconds: float = 0
     note: str = ""
 
 
@@ -80,6 +82,13 @@ class CalibrationPoints(BaseModel):
     bowlerRight: tuple[float, float]
     batterLeft: tuple[float, float]
     batterRight: tuple[float, float]
+
+
+class SeedRequest(BaseModel):
+    frame: int
+    x: float
+    y: float
+    direction: Literal["both", "forward", "backward"] = "both"
 
 
 class CalibratedResult(BaseModel):
