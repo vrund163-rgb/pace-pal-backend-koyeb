@@ -73,6 +73,7 @@ class TrackingPreview(BaseModel):
     framesDetected: int = 0
     detectionRatePct: float = 0
     trajectory: list[TrackedPointModel] = Field(default_factory=list)
+    fullTrajectory: list[TrackedPointModel] = Field(default_factory=list)  # before any trimming
     note: str = ""
 
 
@@ -82,6 +83,36 @@ class CalibrationPoints(BaseModel):
     bowlerRight: tuple[float, float]
     batterLeft: tuple[float, float]
     batterRight: tuple[float, float]
+
+
+class TrimRequest(BaseModel):
+    startFrame: int
+    endFrame: int
+
+
+class BounceRequest(BaseModel):
+    frame: Optional[int] = None   # omit (with clear=True) to go back to automatic bounce detection
+    x: Optional[float] = None     # where the ball touches the ground, in video-frame pixels
+    y: Optional[float] = None
+    clear: bool = False
+
+
+class ManualBounce(BaseModel):
+    frame: int
+    x: float
+    y: float
+
+
+class PaceResult(BaseModel):
+    ok: bool = False
+    kmh: Optional[float] = None
+    lowKmh: Optional[float] = None
+    highKmh: Optional[float] = None
+    rmsPx: Optional[float] = None
+    nPoints: int = 0
+    focalPx: Optional[float] = None
+    focalSource: str = ""
+    note: str = ""
 
 
 class SeedRequest(BaseModel):
@@ -97,7 +128,7 @@ class CalibratedResult(BaseModel):
     bounceFrame: Optional[float] = None  # video frame number (can be between detected frames)
     bounceX: Optional[float] = None  # bounce position in the video frame, pixels
     bounceY: Optional[float] = None
-    bounceConfidence: Literal["clear", "weak", "none"] = "none"
+    bounceConfidence: Literal["clear", "weak", "manual", "none"] = "none"
     calibrationMode: Literal["creases", "stumps"] = "creases"
     note: str = ""
 
@@ -126,6 +157,8 @@ class Session(BaseModel):
     deliveries: list = Field(default_factory=list)
     trackingPreview: Optional[TrackingPreview] = None
     calibratedResult: Optional[CalibratedResult] = None
+    manualBounce: Optional[ManualBounce] = None
+    paceResult: Optional[PaceResult] = None
     isSampleData: bool = False
     note: str = ""
     error: Optional[str] = None
